@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+
+var cli;
+
+Cli = require('../lib/generate/cli');
+
+cli = new Cli();

@@ -1,0 +1,22 @@
+{
+  "name": "<%= name %>",
+  "version": "<%= version %>",
+  "description": "Easily write project generator scripts.",
+  "main": "<%= main %>",
+  "scripts": {
+    "test": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "benastan/js-generate"
+  },
+  "author": "Ben Bergstein",
+  "license": "BSD",
+  "devDependencies": {
+    "chai": "*",
+    "mocha": "*"
+  },
+  "dependencies": {
+    "commander": "*"
+  }
+}

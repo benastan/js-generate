@@ -1,0 +1,8 @@
+{
+  "prompts": {
+    "name": {
+      "prompt": "What is the project's name",
+      "default": "my-proj"
+    }
+  }
+}
