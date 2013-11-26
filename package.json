@@ -16,7 +16,9 @@
     "chai": "*",
     "fake-fs": "*",
     "mocha": "*",
-    "rewire": "*"
+    "nockstream": "*",
+    "rewire": "*",
+    "promise": "*"
   },
   "dependencies": {
     "commander": "*",

@@ -1,4 +1,4 @@
-var chai, Cli, Config, Fs, fs, _fs, path, Project, rewire, Template;
+var chai, Cli, Config, Fs, fs, _fs, path, Project, Prompt, Nockstream, rewire, Template;
 
 chai = require('chai');
 path = require('path');
@@ -7,6 +7,7 @@ Fs = require('fake-fs');
 fs = new Fs();
 _fs = require('fs');
 rewire = require('rewire');
+Nockstream = require('nockstream');
 
 chai.should();
 
@@ -41,6 +42,7 @@ Cli = projectRequire('cli');
 Config = projectRequire('config');
 Template = projectRequire('template');
 Project = projectRequire('project');
+Prompt = projectRequire('prompt');
 
 describe(Template, function() {
   var destinationDir, options, template, templateContent, templateData, templateDestination, projectPath, templateFilename;
@@ -220,7 +222,24 @@ describe(Project, function() {
       });
 
       describe('config given', function() {
+        var templateDir, promptData, promptName;
+
+        templateDir = 'my-template-dir';
+
+        promptName = 'some prompt';
+
+        promptData = {
+        };
+
+        beforeEach(function() {
+          project = new Project();
+        });
       });
+    });
+  });
+
+  describe('#runPrompts', function() {
+    beforeEach(function() {
     });
   });
 });
@@ -252,5 +271,60 @@ describe(Cli, function() {
     cli.program.config.should.eq('myconfig.json');
     cli.program.cwd.should.eq('dummy');
     cli.project.config.settings.templateDir.should.eq(configData.templateDir);
+  });
+});
+
+describe(Prompt, function() {
+  var defaultValue, name, prompt, stream, text;
+
+  name = 'my prompt';
+  text = 'Name';
+  defaultValue = 'my value';
+
+  function makePrompt() {
+    prompt = new Prompt({
+      prompt: text,
+      name: name,
+      defaultValue: defaultValue
+    });
+  }
+
+  describe('#constructor', function() {
+    beforeEach(makePrompt);
+    it('sets some defaults', function() {
+      prompt.text.should.eq(text);
+      prompt.name.should.eq(name);
+    });
+  });
+
+  describe('#execute', function() {
+    beforeEach(function() {
+      stream = new Nockstream({
+        streamString: "myvalue\n"
+      });
+      Prompt = projectRequire('prompt', true);
+      Prompt.__set__({
+        process: {
+          stdin: stream,
+          stdout: {
+            write: function() {}
+          }
+        }
+      });
+      makePrompt();
+    });
+
+    afterEach(function() {
+      Prompt = projectRequire('prompt');
+    });
+
+    it('streams from stdin', function(done) {
+      prompt.execute(function() {
+        prompt.value.should.eq('myvalue');
+        done();
+      });
+
+      stream.start();
+    });
   });
 });
