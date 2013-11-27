@@ -3,6 +3,10 @@
     "name": {
       "prompt": "What is the project's name",
       "default": "my-proj"
+    },
+    "another": {
+      "prompt": "Who is the author?",
+      "default": "Benjamin Bergstein"
     }
   }
 }

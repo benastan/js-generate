@@ -38,6 +38,34 @@ function supportConfig(config, parse) {
   return content;
 }
 
+function mockPrompt(streamString) {
+  var stream;
+
+  stream = new Nockstream({
+    streamString: streamString + "\n"
+  });
+
+  Prompt = projectRequire('prompt', true);
+  Prompt.__set__({
+    process: {
+      stdin: stream,
+      stdout: {
+        write: function() {}
+      }
+    }
+  });
+
+  function prompt() {
+    stream.start();
+  }
+
+  return prompt;
+}
+
+function unmockPrompt() {
+  Prompt = projectRequire('prompt');
+}
+
 Cli = projectRequire('cli');
 Config = projectRequire('config');
 Template = projectRequire('template');
@@ -191,23 +219,23 @@ describe(Config, function() {
 });
 
 describe(Project, function() {
-  var config, configData, project, projectPath;
-
-  configName = 'basic';
-  configText = supportConfig('basic');
-  configData = supportConfig('basic', true);
-
-  beforeEach(function() {
-    fs.patch();
-    fs.dir('dummy');
-    fs.writeFileSync('dummy/config.json', configText);
-  });
-
-  afterEach(function() {
-    fs.unpatch();
-  });
+  var config, configData, configText, project, projectPath;
 
   describe('constructor', function() {
+    beforeEach(function() {
+      configName = 'basic';
+      configText = supportConfig('basic');
+      configData = supportConfig('basic', true);
+
+      fs.patch();
+      fs.dir('dummy');
+      fs.writeFileSync('dummy/config.json', configText);
+    });
+
+    afterEach(function() {
+      fs.unpatch();
+    });
+
     describe('#config', function() {
       describe('no config given', function() {
         beforeEach(function() {
@@ -239,7 +267,45 @@ describe(Project, function() {
   });
 
   describe('#runPrompts', function() {
+    var cwd, start, streamString;
+
     beforeEach(function() {
+      streamString = 'myvalue';
+      start = mockPrompt(streamString);
+
+      Project = projectRequire('project', true);
+      Project.__set__({
+        Prompt: Prompt
+      });
+
+      configText = supportConfig('prompts');
+      configData = supportConfig('prompts', true);
+
+      cwd = 'dummy';
+      fs.patch();
+      fs.dir('dummy');
+      fs.writeFileSync('dummy/config.json', configText);
+      project = new Project({
+        cwd: cwd
+      });
+    });
+
+    afterEach(function() {
+      fs.unpatch();
+      unmockPrompt();
+      Project = projectRequire('project');
+    });
+
+    it('runs the prompts from the config file', function(done) {
+      project.runPrompts(function() {
+        project.prompts[0].executed.should.eq(true);
+        project.prompts[0].value.should.eq('myvalue');
+        project.prompts[1].executed.should.eq(true);
+        project.prompts[1].value.should.eq('myvalue');
+        done();
+      });
+
+      start();
     });
   });
 });
@@ -298,33 +364,22 @@ describe(Prompt, function() {
   });
 
   describe('#execute', function() {
+    var start, streamString;
     beforeEach(function() {
-      stream = new Nockstream({
-        streamString: "myvalue\n"
-      });
-      Prompt = projectRequire('prompt', true);
-      Prompt.__set__({
-        process: {
-          stdin: stream,
-          stdout: {
-            write: function() {}
-          }
-        }
-      });
+      streamString = 'myvalue';
+      start = mockPrompt(streamString);
       makePrompt();
     });
 
-    afterEach(function() {
-      Prompt = projectRequire('prompt');
-    });
+    afterEach(unmockPrompt);
 
     it('streams from stdin', function(done) {
       prompt.execute(function() {
-        prompt.value.should.eq('myvalue');
+        prompt.value.should.eq(streamString);
         done();
       });
 
-      stream.start();
+      start();
     });
   });
 });
