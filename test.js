@@ -2,41 +2,14 @@ var chai, Cli, Config, Fs, fs, _fs, path, Project, Prompt, Nockstream, rewire, T
 
 chai = require('chai');
 path = require('path');
+utils = require('./test/support/utilities');
 
-Fs = require('fake-fs');
-fs = new Fs();
+fs = utils.fs;
 _fs = require('fs');
 rewire = require('rewire');
 Nockstream = require('nockstream');
 
 chai.should();
-
-function projectRequire(dep, useRewire) {
-  var method;
-
-  if (useRewire) method = rewire;
-  else method = require;
-
-  return method('./lib/generate/'+dep);
-}
-
-function supportFile(file) {
-  return _fs.readFileSync(path.join(process.cwd(), 'test', 'support', file), 'utf8');
-}
-
-function supportTemplate(template) {
-  return supportFile(path.join('templates', template));
-}
-
-function supportConfig(config, parse) {
-  var content;
-
-  content = supportFile(path.join('configs', config) + '.json');
-
-  if (parse) return JSON.parse(content);
-
-  return content;
-}
 
 function mockPrompt(streamString) {
   var stream;
@@ -45,7 +18,7 @@ function mockPrompt(streamString) {
     streamString: streamString + "\n"
   });
 
-  Prompt = projectRequire('prompt', true);
+  Prompt = utils.projectRequire('prompt', true);
   Prompt.__set__({
     process: {
       stdin: stream,
@@ -63,34 +36,34 @@ function mockPrompt(streamString) {
 }
 
 function unmockPrompt() {
-  Prompt = projectRequire('prompt');
+  Prompt = utils.projectRequire('prompt');
 }
 
-Cli = projectRequire('cli');
-Config = projectRequire('config');
-Template = projectRequire('template');
-Project = projectRequire('project');
-Prompt = projectRequire('prompt');
+Cli = utils.projectRequire('cli');
+Config = utils.projectRequire('config');
+Template = utils.projectRequire('template');
+Project = utils.projectRequire('project');
+Prompt = utils.projectRequire('prompt');
 
 describe(Template, function() {
-  var destinationDir, options, template, templateContent, templateData, templateDestination, projectPath, templateFilename;
+  var destinationDir, options, template, templateContent, templateData, templateDestination, templateSource, projectPath, templateFilename;
 
+  projectPath = 'dummy';
   destinationDir = 'app';
-  templateContent = supportTemplate('package.json');
+  templateFilename = 'templates/package.json';
+  templateSource = path.join(projectPath, templateFilename);
+  templateDestination = path.join(destinationDir, templateFilename);
+
   templateData = {
     name: 'dummy-app',
     version: '0.0.0',
     main: 'index.js'
   };
-  templateFilename = 'templates/package.json';
-  projectPath = 'dummy';
-
-  templateDestination = path.join(destinationDir, templateFilename);
 
   beforeEach(function() {
-    fs.patch();
-    fs.dir(projectPath);
-    fs.file(path.join(projectPath, templateFilename), templateContent);
+    templateContent = utils.mockTemplate('package.json', templateSource);
+
+    utils.patchFs();
 
     template = new Template({
       cwd: projectPath,
@@ -101,7 +74,7 @@ describe(Template, function() {
 
   afterEach(function() {
     template = undefined;
-    fs.unpatch();
+    utils.unpatchFs();
   });
 
   describe('#constructor', function() {
@@ -191,16 +164,15 @@ describe(Config, function() {
   });
 
   describe('config file exists', function() {
-    var configData, configName, configText;
+    var config, cwd, destinationDirectory, mockConfig;
 
     beforeEach(function() {
-      configName = 'basic';
-      configText = supportConfig('basic');
-      configData = supportConfig('basic', true);
+      cwd = 'dummy';
+      destinationDirectory = path.join(cwd, 'config');
 
-      fs.patch();
-      fs.dir('dummy');
-      fs.writeFileSync('dummy/config.json', configText);
+      mockConfig = utils.mockConfig('basic', destinationDirectory);
+
+      utils.patchFs();
 
       config = new Config({
         cwd: 'dummy'
@@ -208,34 +180,20 @@ describe(Config, function() {
     });
 
     afterEach(function() {
-      fs.unpatch();
+      utils.unpatchFs();
     });
 
     it('loads the config file', function() {
       config.src().should.eq('dummy/config.json');
-      config.settings.templateDir.should.eq('another-template-dir');
+      config.settings.templateDir.should.eq(mockConfig.data.templateDir);
     });
   });
 });
 
 describe(Project, function() {
-  var config, configData, configText, project, projectPath;
+  var config, configDestination, cwd, project, projectPath, mockConfig;
 
   describe('constructor', function() {
-    beforeEach(function() {
-      configName = 'basic';
-      configText = supportConfig('basic');
-      configData = supportConfig('basic', true);
-
-      fs.patch();
-      fs.dir('dummy');
-      fs.writeFileSync('dummy/config.json', configText);
-    });
-
-    afterEach(function() {
-      fs.unpatch();
-    });
-
     describe('#config', function() {
       describe('no config given', function() {
         beforeEach(function() {
@@ -250,50 +208,57 @@ describe(Project, function() {
       });
 
       describe('config given', function() {
-        var templateDir, promptData, promptName;
-
-        templateDir = 'my-template-dir';
-
-        promptName = 'some prompt';
-
-        promptData = {
-        };
-
         beforeEach(function() {
-          project = new Project();
+          cwd = 'dummy';
+          configDestination = path.join(cwd, 'basic');
+
+          mockConfig = utils.mockConfig('basic', configDestination);
+
+          utils.patchFs();
+
+          project = new Project({
+            cwd: cwd,
+            config: 'basic.json'
+          });
+        });
+
+        afterEach(function() {
+          utils.unpatchFs();
+        });
+
+        it('loads the correct config', function() {
+          project.config.settings.templateDir.should.eq(mockConfig.data.templateDir);
         });
       });
     });
   });
 
   describe('#runPrompts', function() {
-    var cwd, start, streamString;
+    var cwd, mockConfig, start, streamString;
 
     beforeEach(function() {
+      cwd = 'dummy';
       streamString = 'myvalue';
       start = mockPrompt(streamString);
 
-      Project = projectRequire('project', true);
+      Project = utils.projectRequire('project', true);
       Project.__set__({
         Prompt: Prompt
       });
 
-      configText = supportConfig('prompts');
-      configData = supportConfig('prompts', true);
+      mockConfig = utils.mockConfig('prompts', path.join(cwd, 'config'));
 
-      cwd = 'dummy';
-      fs.patch();
-      fs.dir('dummy');
-      fs.writeFileSync('dummy/config.json', configText);
+      utils.patchFs();
+
       project = new Project({
         cwd: cwd
       });
     });
 
     afterEach(function() {
-      fs.unpatch();
+      utils.unpatchFs();
       unmockPrompt();
-      Project = projectRequire('project');
+      Project = utils.projectRequire('project');
     });
 
     it('runs the prompts from the config file', function(done) {
@@ -308,35 +273,43 @@ describe(Project, function() {
       start();
     });
   });
+
+  describe('#loadTemplates', function() {
+    beforeEach(function() {
+      fs.patch();
+      fs.dir('dummy');
+    });
+  });
 });
 
 describe(Cli, function() {
-  var Cli, cli, command, configData, configText;
+  var Cli, cli, command, mockConfig;
   beforeEach(function() {
-    Cli = projectRequire('cli', true);
+    Cli = utils.projectRequire('cli', true);
     command = 'node ./bin/generate -c myconfig.json -d dummy';
-    configText = supportConfig('basic');
-    configData = supportConfig('basic', true);
+
+    mockConfig = utils.mockConfig('basic', 'dummy/myconfig');
+
     Cli.__set__({
       process: {
         argv: command.split(' ')
       }
     });
-    fs.patch();
-    fs.dir('dummy');
-    fs.writeFileSync('dummy/myconfig.json', configText);
+
+    utils.patchFs();
+
     cli = new Cli();
   });
 
   afterEach(function() {
-    Cli = projectRequire('cli');
-    fs.unpatch();
+    Cli = utils.projectRequire('cli');
+    utils.unpatchFs();
   });
 
   it('parses the parameters', function() {
     cli.program.config.should.eq('myconfig.json');
     cli.program.cwd.should.eq('dummy');
-    cli.project.config.settings.templateDir.should.eq(configData.templateDir);
+    cli.project.config.settings.templateDir.should.eq(mockConfig.data.templateDir);
   });
 });
 
