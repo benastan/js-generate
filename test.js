@@ -46,13 +46,11 @@ Project = utils.projectRequire('project');
 Prompt = utils.projectRequire('prompt');
 
 describe(Template, function() {
-  var destinationDir, options, template, templateContent, templateData, templateDestination, templateSource, projectPath, templateFilename;
+  var cwd, dest, filename, options, template, templateContent, templateData, templateDestination;
 
-  projectPath = 'dummy';
-  destinationDir = 'app';
-  templateFilename = 'templates/package.json';
-  templateSource = path.join(projectPath, templateFilename);
-  templateDestination = path.join(destinationDir, templateFilename);
+  cwd = 'dummy/templates';
+  dest = 'app';
+  filename = 'sample/package.json';
 
   templateData = {
     name: 'dummy-app',
@@ -60,15 +58,17 @@ describe(Template, function() {
     main: 'index.js'
   };
 
+  templateDestination = 'app/sample/package.json';
+
   beforeEach(function() {
-    templateContent = utils.mockTemplate('package.json', templateSource);
+    templateContent = utils.mockTemplate('package.json', 'dummy/templates/sample/package.json');
 
     utils.patchFs();
 
     template = new Template({
-      cwd: projectPath,
-      src: templateFilename,
-      dest: destinationDir
+      cwd: cwd,
+      src: filename,
+      dest: dest
     });
   });
 
@@ -79,18 +79,18 @@ describe(Template, function() {
 
   describe('#constructor', function() {
     it('sets values from arguments', function() {
-      template._cwd.should.eq(projectPath);
+      template._cwd.should.eq(cwd);
       template._basename.should.eq('package');
-      template._dest.should.eq(destinationDir);
-      template._dirname.should.eq('templates');
+      template._dest.should.eq(dest);
+      template._dirname.should.eq('sample');
       template._ext.should.eq('.json');
-      template._src.should.eq(templateFilename);
+      template._src.should.eq(filename);
     });
   });
 
   describe('#src', function() {
     it('concatenates #cwd and #path', function() {
-      template.src().should.eq(path.join(projectPath, templateFilename));
+      template.src().should.eq(path.join(cwd, filename));
     });
   });
 
@@ -233,12 +233,28 @@ describe(Project, function() {
     });
   });
 
-  describe('#runPrompts', function() {
+  describe('#destination', function() {
+    beforeEach(function() {
+      project = new Project({
+        cwd: 'dummy'
+      });
+    });
+
+    it('should equal cwd', function() {
+      project.destination().should.eq('dummy');
+    });
+
+    it('should equal cwd joined with other segments', function() {
+      project.destination('templates', 'package.json').should.eq('dummy/templates/package.json');
+    });
+  });
+
+  describe.skip('#runPrompts', function() {
     var cwd, mockConfig, start, streamString;
 
     beforeEach(function() {
       cwd = 'dummy';
-      streamString = 'myvalue';
+      streamString = 'my-value';
       start = mockPrompt(streamString);
 
       Project = utils.projectRequire('project', true);
@@ -264,9 +280,9 @@ describe(Project, function() {
     it('runs the prompts from the config file', function(done) {
       project.runPrompts(function() {
         project.prompts[0].executed.should.eq(true);
-        project.prompts[0].value.should.eq('myvalue');
+        project.prompts[0].value.should.eq('my-value');
         project.prompts[1].executed.should.eq(true);
-        project.prompts[1].value.should.eq('myvalue');
+        project.prompts[1].value.should.eq('my-value');
         done();
       });
 
@@ -275,9 +291,67 @@ describe(Project, function() {
   });
 
   describe('#loadTemplates', function() {
+    var cwd, mockTemplate;
     beforeEach(function() {
-      fs.patch();
-      fs.dir('dummy');
+      cwd = 'dummy';
+
+      mockTemplate = utils.mockTemplate('package.json', path.join(cwd, 'templates', 'package.json'));
+
+      utils.patchFs();
+
+      project = new Project({
+        cwd: 'dummy'
+      });
+    });
+
+    afterEach(function() {
+      utils.unpatchFs();
+    });
+
+    it('loads templates from the templates directory', function() {
+      project.loadTemplates();
+      project.templates[0]._basename.should.eq('package');
+      project.templates[0].read().should.eq(mockTemplate);
+    });
+  });
+
+  // Happy path.
+  describe('#run', function() {
+    var templateContent, mockTemplate, start;
+
+    beforeEach(function(done) {
+      mockConfig = utils.mockConfig('prompts', 'dummy/config');
+      mockTemplate = utils.mockTemplate('happy_path.html', 'dummy/templates/mypath/happy_path.html');
+
+      start = mockPrompt('js-generator');
+
+      Project = utils.projectRequire('project', true);
+      Project.__set__({
+        Prompt: Prompt
+      });
+
+      utils.patchFs();
+
+      project = new Project({
+        cwd: 'dummy'
+      });
+
+      project.run(function() {
+        templateContent = fs.readFileSync('mypath/happy_path.html', 'utf8');
+        done();
+      });
+
+      start();
+    });
+
+    afterEach(function() {
+      utils.unpatchFs();
+      unmockPrompt();
+      Project = utils.projectRequire('project');
+    });
+
+    it('runs the project', function() {
+      templateContent.should.eq("<h1>js-generator</h1>\n");
     });
   });
 });
@@ -318,7 +392,7 @@ describe(Prompt, function() {
 
   name = 'my prompt';
   text = 'Name';
-  defaultValue = 'my value';
+  defaultValue = 'myvalue';
 
   function makePrompt() {
     prompt = new Prompt({
@@ -339,7 +413,7 @@ describe(Prompt, function() {
   describe('#execute', function() {
     var start, streamString;
     beforeEach(function() {
-      streamString = 'myvalue';
+      streamString = 'my-value';
       start = mockPrompt(streamString);
       makePrompt();
     });
