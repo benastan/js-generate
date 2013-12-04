@@ -1,4 +1,4 @@
-var emitter, EventEmitter, Fs, fs, _fs, rewire, _slice;
+var emitter, EventEmitter, Fs, fs, _fs, requireHijack, rewire, _slice;
 
 EventEmitter = require('events').EventEmitter;
 Fs = require('fake-fs');
@@ -6,6 +6,7 @@ fs = new Fs();
 _fs = require('fs');
 path = require('path');
 rewire = require('rewire');
+requireHijack = require('require-hijack');
 
 _slice = Array.prototype.slice;
 emitter = new EventEmitter();

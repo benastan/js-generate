@@ -18,7 +18,8 @@
     "mocha": "*",
     "nockstream": "*",
     "rewire": "*",
-    "promise": "*"
+    "promise": "*",
+    "sinon": "*"
   },
   "dependencies": {
     "commander": "*",
