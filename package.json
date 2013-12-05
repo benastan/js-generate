@@ -19,10 +19,11 @@
     "nockstream": "*",
     "rewire": "*",
     "promise": "*",
+    "proxyquire": "*",
     "sinon": "*"
   },
   "dependencies": {
-    "commander": "*",
+    "commander": "2.1.0",
     "ejs": "*",
     "mkdirp": "*"
   }

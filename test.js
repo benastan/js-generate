@@ -1,4 +1,4 @@
-var chai, Cli, Config, Fs, fs, _fs, Generator, path, Project, Prompt, Nockstream, rewire, Template;
+var chai, Cli, Config, Fs, fs, _fs, Generator, Nockstream, path, Project, Prompt, rewire, Template;
 
 chai = require('chai');
 path = require('path');
@@ -95,6 +95,18 @@ describe('The Library', function() {
     describe('#dest', function() {
       it('uses the _dest attribute', function() {
         template.dest().should.eq(templateDestination);
+      });
+
+      describe('when #dest is a function', function() {
+        beforeEach(function() {
+          template._dest = function() {
+            return 'another/dest';
+          };
+        });
+
+        it('runs the function', function() {
+          template.dest().should.eq('another/dest/sample/package.json');
+        });
       });
     });
 
@@ -312,7 +324,53 @@ describe('The Library', function() {
     });
 
     describe('#loadGenerators', function() {
+      var cwd, generatorContent, generatorModule, mockConfig, streamString;
+
       beforeEach(function() {
+        cwd = 'dummy';
+
+        streamString = 'my-value';
+        mockPrompt(streamString);
+
+        mockConfig = utils.mockConfig('prompts', path.join(cwd, 'config'));
+
+        generatorContent = utils.readSupportFile('generators', 'basic_generator.js');
+        generatorModule = require('./test/support/generators/basic_generator');
+        generatorModule['@noCallThru'] = true;
+
+        Generator = utils.projectRequire('generator', false, true, {
+          'dummy/generators/my_generator': generatorModule,
+          './prompt': Prompt
+        });
+
+        Project = utils.projectRequire('project', false, true, {
+          './prompt': Prompt,
+          './generator': Generator
+        });
+
+        utils.mockTemplate('happy_path.html', path.join(cwd, 'templates', 'happy_path.html'));
+
+        utils.patchFs();
+
+        fs.dir(path.join(cwd, 'generators'));
+        fs.writeFileSync(path.join(cwd, 'generators', 'my_generator.js'), generatorContent);
+
+        project = new Project({
+          cwd: cwd
+        });
+
+        project.loadGenerators();
+      });
+
+      afterEach(function() {
+        utils.unpatchFs();
+        Project = utils.projectRequire('project');
+        Generator = utils.projectRequire('generator');
+        unmockPrompt();
+      });
+
+      it('loads the generators', function() {
+        project.generators.length.should.eq(1);
       });
     });
 
@@ -334,11 +392,12 @@ describe('The Library', function() {
         utils.patchFs();
 
         project = new Project({
-          cwd: 'dummy'
+          cwd: 'dummy',
+          dest: 'app'
         });
 
         project.run(function() {
-          templateContent = fs.readFileSync('mypath/happy_path.html', 'utf8');
+          templateContent = fs.readFileSync('app/mypath/happy_path.html', 'utf8');
           done();
         });
       });
@@ -355,34 +414,143 @@ describe('The Library', function() {
     });
   });
 
-  describe(Cli, function() {
-    var Cli, cli, command, mockConfig;
-    beforeEach(function() {
-      Cli = utils.projectRequire('cli', true);
-      command = 'node ./bin/generate -c myconfig.json -d dummy';
+  describe('Cli', function() {
+    var Cli, cli, command, cwd, mockConfig, templateContent;
 
-      mockConfig = utils.mockConfig('basic', 'dummy/myconfig');
-
+    function mockProcess() {
+      Cli = utils.projectRequire('cli', true, false);
       Cli.__set__({
         process: {
+          cwd: function() {
+            return 'dummy';
+          },
           argv: command.split(' ')
         }
       });
+    }
 
-      utils.patchFs();
-
-      cli = new Cli();
-    });
-
-    afterEach(function() {
+    function unmockProcess() {
       Cli = utils.projectRequire('cli');
-      utils.unpatchFs();
+    }
+
+
+    describe('running a whole project', function() {
+      beforeEach(function(done) {
+        cwd = 'dummy';
+
+        command = 'custom-generate';
+
+        streamString = 'my-value';
+
+        mockPrompt(streamString);
+
+        mockProcess();
+
+        Project = utils.projectRequire('project', true);
+        Project.__set__({
+          Prompt: Prompt
+        });
+
+        Cli.__set__({
+          Project: Project
+        });
+
+        mockConfig = utils.mockConfig('prompts', path.join(cwd, 'config'));
+
+        utils.mockTemplate('happy_path.html', path.join(cwd, 'templates', 'happy_path.html'));
+
+        utils.patchFs();
+
+        cli = new Cli({
+          cwd: 'dummy',
+          dest: 'app'
+        });
+
+        cli.run(function() {
+          templateContent = fs.readFileSync('./app/happy_path.html', 'utf8');
+          done();
+        });
+      });
+
+      afterEach(function() {
+        utils.unpatchFs();
+        unmockPrompt();
+        unmockProcess();
+      });
+
+      it('parses the parameters', function() {
+        cli.program.dest.should.eq('app');
+        cli.project._dest.should.eq('app');
+        cli.project._cwd.should.eq('dummy');
+        cli.hasGenerator.should.eq(false);
+        templateContent.should.eq("<h1>my-value</h1>\n");
+      });
     });
 
-    it('parses the parameters', function() {
-      cli.program.config.should.eq('myconfig.json');
-      cli.program.cwd.should.eq('dummy');
-      cli.project.config.settings.templateDir.should.eq(mockConfig.data.templateDir);
+    describe.only('running a generator', function() {
+      var generatorContent, generatorModule;
+
+      beforeEach(function(done) {
+        cwd = 'dummy';
+
+        command = 'node custom-generate my_generator';
+
+        streamString = 'my-value';
+
+        mockPrompt(streamString);
+
+        mockProcess();
+
+        generatorContent = utils.readSupportFile('generators', 'basic_generator.js');
+        generatorModule = require('./test/support/generators/basic_generator');
+        generatorModule['@noCallThru'] = true;
+
+        Generator = utils.projectRequire('generator', false, true, {
+          'dummy/generators/my_generator': generatorModule,
+          './prompt': Prompt
+        });
+
+        Project = utils.projectRequire('project', false, true, {
+          './prompt': Prompt,
+          './generator': Generator
+        });
+
+        Cli.__set__({
+          Project: Project
+        });
+
+        mockConfig = utils.mockConfig('prompts', path.join(cwd, 'config'));
+
+        utils.mockTemplate('happy_path.html', path.join(cwd, 'templates', 'happy_path.html'));
+
+        utils.patchFs();
+
+        fs.dir(path.join(cwd, 'generators'));
+        fs.writeFileSync(path.join(cwd, 'generators', 'my_generator.js'), generatorContent);
+
+        cli = new Cli({
+          cwd: 'dummy',
+          dest: 'app'
+        });
+
+        cli.run(function() {
+          templateContent = fs.readFileSync('./app/happy_path.html', 'utf8');
+          done();
+        });
+      });
+
+      afterEach(function() {
+        utils.unpatchFs();
+        unmockPrompt();
+        unmockProcess();
+      });
+
+      it('parses the parameters', function() {
+        cli.project._dest.should.eq('app');
+        cli.project._cwd.should.eq('dummy');
+        cli.hasGenerator.should.eq(false);
+        templateContent.should.eq("<h1>my-value</h1>\n");
+      });
     });
   });
 
@@ -437,22 +605,19 @@ describe('The Library', function() {
       streamString = 'my-value';
       mockPrompt(streamString);
 
-      Project = utils.projectRequire('project', true);
-      Project.__set__({
-        Prompt: Prompt
-      });
-
       mockConfig = utils.mockConfig('prompts', path.join(cwd, 'config'));
 
       generatorModule = require('./test/support/generators/basic_generator');
+      generatorModule['@noCallThru'] = true;
 
-      Generator = utils.projectRequire('generator', true);
-      Generator.__set__({
-        require: function(module) {
-          if (module === './generators/my_generator') return generatorModule;
-          else return require(module);
-        },
-        Prompt: Prompt
+      Generator = utils.projectRequire('generator', false, true, {
+        './generators/my_generator': generatorModule,
+        './prompt': Prompt
+      });
+
+      Project = utils.projectRequire('project', false, true, {
+        './prompt': Prompt,
+        './generator': Generator
       });
 
       utils.mockTemplate('happy_path.html', path.join(cwd, 'templates', 'happy_path.html'));
@@ -483,11 +648,18 @@ describe('The Library', function() {
     });
 
     describe('#run', function() {
-      it('runs the prompts', function(done) {
+      var templateResult;
+
+      beforeEach(function(done) {
         generator.run(function() {
-          generator.prompts[0].executed.should.eq(true);
+          templateResult = fs.readFileSync('happy_path.html', 'utf8');
           done();
         });
+      });
+
+      it('runs the prompts', function() {
+        generator.prompts[0].executed.should.eq(true);
+        templateResult.should.eq('<h1>my-value</h1>\n');
       });
     });
   });

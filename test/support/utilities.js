@@ -1,4 +1,4 @@
-var emitter, EventEmitter, Fs, fs, _fs, requireHijack, rewire, _slice;
+var emitter, EventEmitter, Fs, fs, _fs, proxyquire, requireHijack, rewire, _slice;
 
 EventEmitter = require('events').EventEmitter;
 Fs = require('fake-fs');
@@ -7,6 +7,7 @@ _fs = require('fs');
 path = require('path');
 rewire = require('rewire');
 requireHijack = require('require-hijack');
+proxyquire = require('proxyquire');
 
 _slice = Array.prototype.slice;
 emitter = new EventEmitter();
@@ -17,6 +18,7 @@ module.exports = {
   mockTemplate: mockTemplate,
   patchFs: patchFs,
   projectRequire: projectRequire,
+  readSupportFile: readSupportFile,
   unpatchFs: unpatchFs
 };
 
@@ -66,14 +68,25 @@ function patchFs() {
   emitter.emit('patch');
 }
 
-function projectRequire(moduleName, useRewire) {
-  var method;
+function projectRequire() {
+  var args, method, moduleName, useRewire, useProxyquire, relativePath;
+
+  args = _slice.apply(arguments);
+
+  moduleName = args.shift();
+  useRewire = args.shift();
+  useProxyquire = args.shift();
+
+  relativePath = '../../lib/generate/' + moduleName;
+  args.unshift(relativePath);
 
   if (useRewire) method = rewire;
 
+  else if (useProxyquire) method = proxyquire;
+
   else method = require;
 
-  return method('../../lib/generate/' + moduleName);
+  return method.apply(this, args);
 }
 
 function readSupportFile() {
