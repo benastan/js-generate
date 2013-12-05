@@ -1,12 +1,16 @@
 {
   "prompts": {
     "name": {
+      "option": "-n, --name <name>",
       "prompt": "What is the project's name",
-      "default": "my-proj"
+      "default": "my-proj",
+      "description": "The name of the project."
     },
     "another": {
+      "option": "-a, --another <another>",
       "prompt": "Who is the author?",
-      "default": "Benjamin Bergstein"
+      "default": "Benjamin Bergstein",
+      "description": "The name of the author of the module."
     }
   }
 }

@@ -493,7 +493,7 @@ describe('The Library', function() {
       beforeEach(function(done) {
         cwd = 'dummy';
 
-        command = 'node custom-generate my_generator';
+        command = 'node custom-generate my_generator --another somevalue';
 
         streamString = 'my-value';
 
@@ -533,6 +533,19 @@ describe('The Library', function() {
           dest: 'app'
         });
 
+        (function() {
+          var generator, prompt;
+
+          generator = cli.project.generators[0];
+
+          generator.usePrompt('another');
+
+          prompt = generator.prompts[1];
+
+          cli.addPromptToGeneratorCommand(generator, prompt);
+        })();
+        //console.log(cli.program.commands[0]);
+
         cli.run(function() {
           templateContent = fs.readFileSync('./app/happy_path.html', 'utf8');
           done();
@@ -548,7 +561,7 @@ describe('The Library', function() {
       it('parses the parameters', function() {
         cli.project._dest.should.eq('app');
         cli.project._cwd.should.eq('dummy');
-        cli.hasGenerator.should.eq(false);
+        cli.project.generators[0].prompts[1].value.should.eq('somevalue');
         templateContent.should.eq("<h1>my-value</h1>\n");
       });
     });
