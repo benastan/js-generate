@@ -479,15 +479,13 @@ describe('The Library', function() {
       });
 
       it('parses the parameters', function() {
-        cli.program.dest.should.eq('app');
         cli.project._dest.should.eq('app');
         cli.project._cwd.should.eq('dummy');
-        cli.hasGenerator.should.eq(false);
         templateContent.should.eq("<h1>my-value</h1>\n");
       });
     });
 
-    describe.only('running a generator', function() {
+    describe('running a generator', function() {
       var generatorContent, generatorModule;
 
       beforeEach(function(done) {
@@ -642,6 +640,7 @@ describe('The Library', function() {
       });
 
       generator = new Generator({
+        cwd: '.',
         src: 'generators/my_generator',
         project: project
       });
