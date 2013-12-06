@@ -536,7 +536,7 @@ describe('The Library', function() {
 
           generator = cli.project.generators[0];
 
-          generator.usePrompt('another');
+          generator.prompt('another');
 
           prompt = generator.prompts[1];
 
