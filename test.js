@@ -542,7 +542,6 @@ describe('The Library', function() {
 
           cli.addPromptToGeneratorCommand(generator, prompt);
         })();
-        //console.log(cli.program.commands[0]);
 
         cli.run(function() {
           templateContent = fs.readFileSync('./app/happy_path.html', 'utf8');
